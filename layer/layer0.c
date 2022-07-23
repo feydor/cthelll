@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
@@ -7,9 +8,10 @@
 #include <string.h>
 #define MAXCODESIZE 333
 #define NON_NUMERIC INT_MAX
+#define NIL -1
 FILE *fp;
 char code[MAXCODESIZE];
-int jmptable[MAXCODESIZE] = {-1};
+int jmptable[MAXCODESIZE];
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
 int mem[26] = {0};
 int codelen, lines;
@@ -39,51 +41,66 @@ int strnum(char *s) {
     }
     return n;
 }
-int num2reg_operand(char* op1, char *num, int line) {
-    if (!op1 || !num) fprintf(stderr, "invalid operands: %d\n", line), exit(1);
-    char reg = op1[0];
-    if (!strfind(regs, reg)) fprintf(stderr, "invalid register: %d: %c\n", line, reg), exit(1);
-    int n = strnum(num);
-    if (n == NON_NUMERIC) fprintf(stderr, "non-numeric operand: %d: %s\n", line, num), exit(1);
-    return n;
+void num2reg_op(char *instr, char reg, int n, int line) {
+    if (!strcmp("mov", instr)) {
+        mem[reg-97] = n;
+    } else if (!strcmp("add", instr)) {
+        mem[reg-97] += n;
+    } else if (!strcmp("sub", instr)) {
+        mem[reg-97] -= n;
+    } else {
+        fprintf(stderr, "unknown opcode: %d\n", line);
+    }
+}
+bool isregister(char *operand) {
+    assert(strlen(operand) == 1);
+    return strfind(regs, operand[0]);
+}
+bool isnumeric(char *operand) {
+    while (*operand) {
+        if (!isdigit(*operand)) return false;
+        operand++;
+    }
+    return true;
+}
+bool islabel(char *operand) {
+    return jmptable[hash(operand)] != NIL;
 }
 int main(int argc, char *argv[]) {
     if (argc != 2) printf("program: layer0 [file]\n"), exit(1);
     if (!(fp = fopen(argv[1], "r"))) fprintf(stderr, "error opening the file.\n"), exit(1);
     codelen = fread(code, 1, MAXCODESIZE, fp);
     fclose(fp);
+    for (int i = 0; i < sizeof(jmptable)/sizeof(jmptable[0]); ++i)
+        jmptable[i] = NIL;
     // first pass
     int tcc = 0;
     lines = 1;
     while (tcc != codelen) {
         int cc = 0;
         while (code[tcc+cc] != '\n') {
-            printf("'%c'", code[tcc+cc]);
             cc++;
         }
-        printf("\n");
         char line[cc];
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
         char *instr = strtok(line, " ");
         if (line[strlen(line)-1] == ':') {
             char *lbl = strtok(line, ":");
-            if (jmptable[hash(lbl)]) fprintf(stderr, "duplicate label: %d\n", lines), exit(1);
+            if (jmptable[hash(lbl)] != NIL) fprintf(stderr, "duplicate label: %d\n", lines), exit(1);
             jmptable[hash(lbl)] = tcc;
         } else if (!strcmp("jmp", instr)) {
             char *cmd = strtok(NULL, " ");
             if (!cmd) fprintf(stderr, "missing label: %s\n", line), exit(1);
-            // TODO: what if hash collsions aka duplicate labels
-            if (jmptable[hash(cmd)] < 0) fprintf(stderr, "invalid label: %d: %s\n", lines, cmd), exit(1);
+            if (jmptable[hash(cmd)] == NIL) fprintf(stderr, "invalid label: %d: %s\n", lines, cmd), exit(1);
         }
         tcc += cc+1;
         lines++;
     }
-    printf("pass 1 done\n\n");
     
     tcc = 0;
     int lp = 1;
-    while (tcc != codelen) {
+    while (tcc < codelen) {
         int cc = 0;
         while (code[tcc+cc] != '\n') {
             cc++;
@@ -92,22 +109,36 @@ int main(int argc, char *argv[]) {
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
         char *instr = strtok(line, " ");
-        if (!strcmp("mov", instr)) {
-            char *cmd = strtok(NULL, " ");
-            if (!cmd) fprintf(stderr, "missing operands: %d\n", lp), exit(1);
-            char *op1 = strtok(cmd, ",");
-            char *op2 = strtok(NULL, ",");
-            mem[op1[0]-97] = num2reg_operand(op1, op2, lp);
-        } else if (!strcmp("#", instr)) {
-            char *op1 = strtok(NULL, " ");
-            if (!op1) fprintf(stderr, "invalid operand: %d\n", lp), exit(1);
-            if (!strfind(regs, op1[0])) fprintf(stderr, "invalid register: %d: %c\n", lp, op1[0]), exit(1);
-            printf("%c: %d\n", op1[0], mem[op1[0]-97]);
-        } else if (!strcmp("jmp", instr)) {
-            char *cmd = strtok(NULL, " ");
-            tcc = jmptable[hash(cmd)];
-            continue;
+        char *operands = strtok(NULL, " ");
+        char *op1 = strtok(operands, ",");
+        char *op2 = strtok(NULL, ",");
+        char *op3 = strtok(NULL, ",");
+        if (!instr) break;
+        
+        if (operands && op1 && op2 && op3 && isregister(op1) && isnumeric(op2) && islabel(op3)) {
+            if (!strcmp("bne", instr)) {
+                int n = strnum(op2);
+                if (mem[op1[0]-97] != n) {
+                    tcc = jmptable[hash(op3)];
+                    continue;
+                }
+            }
+        } else if (operands && op1 && op2 && isregister(op1) && isnumeric(op2)) {
+            int n = strnum(op2);
+            num2reg_op(instr, op1[0], n, lp);
+        } else if (operands && islabel(operands)) {
+            // TODO: label_reg_op();
+            if (!strcmp("jmp", instr)) {
+                tcc = jmptable[hash(operands)];
+                continue;
+            }
+        } else if (operands && op1 && isregister(op1))  {
+            // TODO: reg_op();
+            if (!strcmp("#", instr)) {
+                printf("%c: %d\n", op1[0], mem[op1[0]-97]);
+            }
         }
+
         tcc += cc+1;
         lp++;
     }

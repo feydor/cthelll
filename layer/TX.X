@@ -1,4 +1,5 @@
-a:
-mov b,333
+mov b,10
+x:
+sub b,1
 # b
-jmp a
+bne b,0,x
