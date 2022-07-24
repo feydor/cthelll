@@ -66,22 +66,24 @@ Pred *IsZero(int x) {
     return Nil() == x ? T : F;
 }
 
-// typedef void Pair(int, int);
 typedef struct Pair { void *first; void *second; } Pair;
-Pair Cons(Real *x, Real *y) {
-    Pair p = {.first = (void *)x, .second = (void *)y};
+typedef struct RealN { int n; } RealN;
+Pair Cons(RealN *x, RealN *y) {
+    Pair p = {.first = x, .second = y};
     return p;
 }
 
-Real *Car(Pair p) {
-    return (Real *)p.first;
+RealN *Car(Pair p) {
+    return p.first;
 }
-Real *Cdr(Pair p) {
-    return (Real *)p.second;
+RealN *Cdr(Pair p) {
+    return p.second;
 }
 
-void PCons(Pair p) {
-    printf("( %d, %d )\n", Car(p)(), Cdr(p)());
+char *ConsStr(Pair p) {
+    char str[255];
+    sprintf(str, "(%d, %d)", Car(p)->n, Cdr(p)->n);
+    return strdup(str);
 }
 
 int main(void) {
@@ -126,9 +128,7 @@ int main(void) {
     printf("Succ(x:1) = Plus(CN, x:1, C(S, Nil()), Nil()) = %d\n", _Plus(ComposeN, 1, Compose(S, Nil()), Nil()));
     printf("Succ(CN, Nil(), CN(S, Nil(), 30)) = %d\n", _Succ(ComposeN, Nil(), ComposeN(S, Nil(), 30)));
     
-    Pair p = Cons(Nil, Nil);
-    PCons(p);
-    //printf("Cons(33, 11) = %s\n", PCons(Cons(33, 11)));
-    //printf("Car(Cons((void *)33), (void *)11) = %d\n", *(int *)Car(Cons((void *)&a, (void *)&b)));
-    //printf("Cdr(Cons((void *)33), (void *)11) = %d\n", *(int *)Cdr(Cons((void *)&a, (void *)&b)));
+    printf("Cons(33, 11) = %s\n", ConsStr(Cons(&(RealN){33} , &(RealN){11})));
+    printf("Car(Cons(33, 11)) = %d\n", Car(Cons(&(RealN){33}, &(RealN){11}))->n);
+    printf("Cdr(Cons(33, 11)) = %d\n", Cdr(Cons(&(RealN){33}, &(RealN){11}))->n);
 }
