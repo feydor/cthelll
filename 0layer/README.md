@@ -1,18 +1,20 @@
 # 0layer
 ```asm
+% map print on odd numbers in range 0..100
 debut:
-    mov a,1
-to100:
-    mov b,a
+    mov a,0
+    mov b,0
+loopto100:
     mod a,2
-    beq a,1,odd
-even:
-    mov a,b
+    beq a,0,incr
+    call odd
+incr:
     add a,1
-    bne a,100,to100
-    beq a,100,fin
+    add b,1
+    bne b,100,loopto100
+    beq b,100,fin
 odd:
     # b
-    jmp even
+    ret
 fin:
 ```

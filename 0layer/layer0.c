@@ -118,15 +118,10 @@ int main(int argc, char *argv[]) {
         char line[cc];
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
-        char *instr = strtok(line, " ");
         if (line[strlen(line)-1] == ':') {
             char *lbl = strtok(line, ":");
             if (jmptable[hash(lbl)] != NIL) fprintf(stderr, "duplicate label: %d: '%s'\n", lines, lbl), exit(1);
             jmptable[hash(lbl)] = tcc;
-        } else if (!strcmp("jmp", instr)) {
-            char *cmd = strtok(NULL, " ");
-            if (!cmd) fprintf(stderr, "missing label: %s\n", line), exit(1);
-            if (jmptable[hash(cmd)] == NIL) fprintf(stderr, "invalid label: %d: %s\n", lines, cmd), exit(1);
         }
         tcc += cc+1;
         lines++;
@@ -142,10 +137,9 @@ int main(int argc, char *argv[]) {
         char line[cc];
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
-        if (line[0] == '%') {    
-            tcc += cc+1;
-            lines++;
-            continue;
+        char *pos = NULL;
+        if ((pos = strchr(line, '%'))) {    
+            line[pos-line] = '\0';
         }
 
         char *instr = strtok(line, " ");
@@ -153,7 +147,11 @@ int main(int argc, char *argv[]) {
         char *op1 = strtok(operands, ",");
         char *op2 = strtok(NULL, ",");
         char *op3 = strtok(NULL, ",");
-        if (!instr) break;
+        if (!instr) {
+            tcc += cc+1;
+            lp++;
+            continue;
+        }
         
         if (operands && op1 && op2 && op3 && isregister(op1) && isnumeric(op2) && islabel(op3)) {
             if (!strcmp("bne", instr)) {
