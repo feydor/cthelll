@@ -21,10 +21,29 @@ Pred *Xor(Pred *x, Pred *y) {
     return Or(And(x, Not(y)), And(Not(x), y));
 }
 
-typedef int Real(void);
+typedef int Real(int);
 int Nil(void) { return 0; }
 int S(int x) { return x + 1; }
-int Num(Real *x) { return x(); }
+
+int Compose(Real *f, int x) {
+    return f(x);
+}
+
+// 1 is pos, -1 is neg, 0 is zero
+int sign(int n) {
+    return n == 0 ? 0 : n > 0 ? 1 : -1;
+}
+
+int ComposeN(Real *f, int x, int n) {
+    if (!n) return x;
+    return ComposeN(f, f(x), n-1);
+}
+
+typedef int ChurchNumeral(Real*, int, int);
+
+int Plus(ChurchNumeral *f, int m, int n, int x) {
+    return f(S, f(S, x, n), m);
+}
 
 double reduce_itr(double data[], size_t len, double acc, size_t start, void f(double *, double)) {
     if (start == len) return acc;
@@ -47,7 +66,6 @@ void map(void *list, size_t n_elems, size_t size, void f(void *)) {
         f((void *)list+i);
 }
 
-
 void printarr(double arr[], size_t n_elems) {
     printf("[ ");
     for (size_t i = 0; i < n_elems; ++i)
@@ -58,7 +76,6 @@ void printarr(double arr[], size_t n_elems) {
 char *P(Pred *x) { return x() ? "T" : "F"; }
 int main(void) {
     double data[] = {5, 10, 15, 20, 25};  
-    double res = reduce(data, len(data), 0, sum);
     map(data, len(data), sizeof(double), inc_dbl);
     
     printf("=== church-encoded logic primitives ===\n");
@@ -78,16 +95,21 @@ int main(void) {
     printf("Xor(False(T,F), True(T,F)) = %s\n", P(Xor(False(T, F), True(T, F))));
     printf("Xor(False(T,F), False(T,F)) = %s\n", P(Xor(False(T, F), False(T, F))));
 
-    printf("\n=== church-encoded reals ===\n");
+    printf("\n===== church-encoded reals =====\n");
     printf("Nil() = %d\n", Nil());
-    printf("S(Nil()) = %d\n", S(Nil()));
-    printf("S(S(Nil())) = %d\n", S(S(Nil())));
-    printf("S(S(S(Nil()))) = %d\n", S(S(S(Nil()))));
-    printf("S(S(S(S(Nil())))) = %d\n", S(S(S(S(Nil())))));
-    printf("S(S(S(S(S(Nil()))))) = %d\n", S(S(S(S(S(Nil()))))));
-    printf("S(S(S(S(S(S(Nil())))))) = %d\n", S(S(S(S(S(S(Nil())))))));
-    printf("S(S(S(S(S(S(S(Nil()))))))) = %d\n", S(S(S(S(S(S(S(Nil()))))))));
-    printf("S(S(S(S(S(S(S(S(Nil())))))))) = %d\n", S(S(S(S(S(S(S(S(Nil())))))))));
-    printf("S(S(S(S(S(S(S(S(S(Nil()))))))))) = %d\n", S(S(S(S(S(S(S(S(S(Nil()))))))))));
-    printf("S(S(S(S(S(S(S(S(S(S(Nil())))))))))) = %d\n", S(S(S(S(S(S(S(S(S(S(Nil())))))))))));
+    printf("Compose(S, Nil()) = %d\n", Compose(S, Nil()));
+    printf("Compose(S, Compose(S, Nil())) = %d\n", Compose(S, Compose(S, Nil())));
+    printf("Compose(S, Compose(S, Compose(S, Nil()))) = %d\n", Compose(S, Compose(S, Compose(S, Nil()))));
+    printf("Compose(S, Compose(S, Compose(S, Compose(S, Nil())))) = %d\n", Compose(S, Compose(S, Compose(S, Compose(S, Nil())))));
+    printf("Compose(S, Compose(S, Compose(S, Compose(S, Compose(S, Nil()))))) = %d\n", Compose(S, Compose(S, Compose(S, Compose(S, Compose(S, Nil()))))));
+
+    printf("...\nusing the general definition: \n");
+    printf("=== n = λf.λx.f^n x ===\n");
+    printf("ComposeN(S, Nil(), 333) = %d\n", ComposeN(S, Nil(), 333));
+
+    printf("\n===== arithmetics on church-encoded reals =====\n");
+    printf("Plus(CN, C(S, C(S, Nil())), C(S, C(S, C(S, Nil()))), Nil()) = %d\n",
+            Plus(ComposeN, Compose(S, Compose(S, Nil())), Compose(S, Compose(S, Compose(S, Nil()))), Nil()));
+    printf("Plus(CN, CN(S, Nil(), 2), CN(S, Nil(), 3), Nil()) = %d\n", Plus(ComposeN, ComposeN(S, Nil(), 2), ComposeN(S, Nil(), 3), Nil()));
+    printf("S(x) => Plus(ComposeN, 1, Nil(), Nil()) = %d\n", Plus(ComposeN, 1, Nil(), Nil()));
 }
