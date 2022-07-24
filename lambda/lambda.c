@@ -127,7 +127,6 @@ int main(void) {
     printf("Plus(CN, CN(S, Nil(), 2), CN(S, Nil(), 3), Nil()) = %d\n", _Plus(ComposeN, ComposeN(S, Nil(), 2), ComposeN(S, Nil(), 3), Nil()));
     printf("Succ(x:1) = Plus(CN, x:1, C(S, Nil()), Nil()) = %d\n", _Plus(ComposeN, 1, Compose(S, Nil()), Nil()));
     printf("Succ(CN, Nil(), CN(S, Nil(), 30)) = %d\n", _Succ(ComposeN, Nil(), ComposeN(S, Nil(), 30)));
-    
     printf("Cons(33, 11) = %s\n", ConsStr(Cons(&(RealN){33} , &(RealN){11})));
     printf("Car(Cons(33, 11)) = %d\n", Car(Cons(&(RealN){33}, &(RealN){11}))->n);
     printf("Cdr(Cons(33, 11)) = %d\n", Cdr(Cons(&(RealN){33}, &(RealN){11}))->n);

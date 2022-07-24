@@ -12,6 +12,8 @@
 FILE *fp;
 char code[MAXCODESIZE];
 int jmptable[MAXCODESIZE];
+int stack[MAXCODESIZE];
+int sp = 0;
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
 int mem[26] = {0};
 int codelen, lines;
@@ -129,7 +131,6 @@ int main(int argc, char *argv[]) {
         tcc += cc+1;
         lines++;
     }
-    printf("first pass done\n");
     
     tcc = 0;
     int lp = 0;
@@ -141,8 +142,12 @@ int main(int argc, char *argv[]) {
         char line[cc];
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
-        // trim_ws(line);
-       // printf("line: '%s'\n", line);
+        if (line[0] == '%') {    
+            tcc += cc+1;
+            lines++;
+            continue;
+        }
+
         char *instr = strtok(line, " ");
         char *operands = strtok(NULL, " ");
         char *op1 = strtok(operands, ",");
@@ -177,11 +182,22 @@ int main(int argc, char *argv[]) {
             if (!strcmp("jmp", instr)) {
                 tcc = jmptable[hash(operands)];
                 continue;
+            } else if (!strcmp("call", instr)) {
+                stack[sp] = tcc + cc + 1;
+                sp++;
+                tcc = jmptable[hash(operands)];
+                continue;
             }
         } else if (operands && op1 && isregister(op1))  {
             // TODO: reg_op();
             if (!strcmp("#", instr)) {
                 printf("%c: %d\n", op1[0], mem[op1[0]-'a']);
+            }
+        } else {
+            if (!strcmp("ret", instr)) {
+                tcc = stack[--sp];
+                if (sp < 0) fprintf(stderr, "ret without corresponding call\n"), exit(1);
+                continue;
             }
         }
 

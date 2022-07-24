@@ -1,9 +1,11 @@
-main:
+% map print_odd on range 0..100
+debut:
     mov a,1
 to100:
     mov b,a
     mod a,2
-    beq a,1,odd
+    beq a,0,even
+    call print_odd
 even:
     mov a,b
     add a,1
@@ -11,5 +13,5 @@ even:
     beq a,100,fin
 odd:
     # b
-    jmp even
+    ret
 fin:
