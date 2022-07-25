@@ -1,17 +1,14 @@
-% map print on odd n in range 0..100
+% map print on odd numbers in range 0..100
 debut:
-    mov a,0
-    mov b,0
+    xor a,a
+    xor b,b
 to100:
     mod a,2
     beq a,0,incr
-    call odd
+print_odd:
+    # b
 incr:
     add a,1
     add b,1
     bne b,100,to100
-    beq b,100,fin
-odd:
-    # b
-    ret
 fin:

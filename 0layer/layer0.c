@@ -63,7 +63,9 @@ void num2reg_op(char *instr, int reg, int n, int line) {
 void reg2reg_op(char *instr, int reg1, int reg2, int line) {
     if (!strcmp("mov", instr)) {
         mem[reg1] = mem[reg2];
-    } if (!strcmp("xor", instr)) {
+    } else if(!strcmp("add", instr)) {
+        mem[reg1] += mem[reg2];
+    } else if (!strcmp("xor", instr)) {
         mem[reg1] ^= mem[reg2];
     } else if (!strcmp("and", instr)) {
         mem[reg1] &= mem[reg2];
@@ -152,29 +154,28 @@ int main(int argc, char *argv[]) {
             lp++;
             continue;
         }
-        
         if (operands && op1 && op2 && op3 && isregister(op1) && isnumeric(op2) && islabel(op3)) {
             if (!strcmp("bne", instr)) {
-                if (mem[op1[0]-97] != strnum(op2)) {
+                if (mem[op1[strlen(op1)-1]-'a'] != strnum(op2)) {
                     tcc = jmptable[hash(op3)];
                     continue;
                 }
             } else if (!strcmp("beq", instr)) {
-                if (mem[op1[0]-97] == strnum(op2)) {
+                if (mem[op1[strlen(op1)-1]-'a'] == strnum(op2)) {
                     tcc = jmptable[hash(op3)];
                     continue;
                 }
             } else if (!strcmp("blt", instr)) {
-                if (mem[op1[0]-97] < strnum(op2)) {
+                if (mem[op1[strlen(op1)-1]-'a'] < strnum(op2)) {
                     tcc = jmptable[hash(op3)];
                     continue;
                 }
             }
         } else if (operands && op1 && op2 && isregister(op1) && isnumeric(op2)) {
             int n = strnum(op2);
-            num2reg_op(instr, op1[0]-'a', n, lp);
+            num2reg_op(instr, op1[strlen(op1)-1]-'a', n, lp);
         } else if (operands && op1 && op2 && isregister(op1) && isregister(op2)) {
-            reg2reg_op(instr, op1[0]-'a', op2[0]-'a', lp);
+            reg2reg_op(instr, op1[strlen(op1)-1]-'a', op2[strlen(op2)-1]-'a', lp);
         } else if (operands && islabel(operands)) {
             // TODO: label_reg_op();
             if (!strcmp("jmp", instr)) {
@@ -189,7 +190,7 @@ int main(int argc, char *argv[]) {
         } else if (operands && op1 && isregister(op1))  {
             // TODO: reg_op();
             if (!strcmp("#", instr)) {
-                printf("%c: %d\n", op1[0], mem[op1[0]-'a']);
+                printf("%c: %d\n", op1[strlen(op1)-1], mem[op1[strlen(op1)-1]-'a']);
             }
         } else {
             if (!strcmp("ret", instr)) {
