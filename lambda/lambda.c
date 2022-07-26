@@ -54,6 +54,14 @@ int Plus(int n, int m) {
     return _Plus(ComposeN, m, n, Nil());
 }
 
+int _Mul(ChurchNumeral *f, int m, int n) {
+    return f(Plus(m, 0), n, 0);
+}
+
+int Mul(int n, int m) {
+    return _Mul(ComposeN, m, n, Nil());
+}
+
 int _Succ(ChurchNumeral *f, int n, int x) {
     return Compose(S, f(S, x, n));
 }
