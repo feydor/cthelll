@@ -10,14 +10,18 @@ cell 8 = n''
 cell 9 = i
 cell 10 = inner loop counter & special char printer
 
-                        x=0
+each iteration:
+p' = c
+c' = n
+n' = c plus n
+
 >                       p=0
 > > >                   c=c'=c''=0
 > + > >                 n=1 n'=n''=0
-> ++++ +++ ++            i=9
+> ++++ +++ ++           i=9
 
-print the first three numbers in the series
-
+print the first numbers in the series
+note: always return to cell 9 (i)
 print c using cell 1 as counter
 < < < < < <
 << ++++ ++++
@@ -33,8 +37,9 @@ print c using cell 1 as counter
 ]
 >>
 > > > > > >
-    
->++++++++ ++++++++ ++++++++ ++++++++.[-]<       print space and clear cell
+
+print space and clear cell
+>++++++++ ++++++++ ++++++++ ++++++++.[-]<
 
 print n using cell 1 as counter
 < < <
@@ -52,72 +57,66 @@ print n using cell 1 as counter
 >>>>>
 > > >
     
->++++++++ ++++++++ ++++++++ ++++++++.[-]<       print space and clear cell
-
+print space and clear cell
+>++++++++ ++++++++ ++++++++ ++++++++.[-]<
 [ 
-    copy n to n' and n'' clearing n
+    copy n to n' and n'' clearing and returning to n
     < < <
     [
         > + > +
         < < -
     ]
-    n' and n'' are copies of n
-    at n
 
-    copy c to c' and c'' clearing c
+    copy c to c' and c'' clearing and returning to c
     < < <
     [
         > + > +
         < < -
     ]
-    at c (cell 3)
 
-    add c' into n' clearing c'
+    add c' into n' clearing and returning to c'
     >
     [
         > > > +
         < < < -
     ]
     n' = n plus c
-    at c'
     
-    add n'' into c' clearing n''
+    add n'' into c' clearing and returning to n''
     > > > >
     [
         < < < < +
         > > > > -
     ]
     c' = n
-    at n''
 
     n = 0 // n'=n plus c // n'' = 0 // c = 0 // c' = n // c'' = c = p
-    now we need to move these numbers back to their original registers
+    now we need to move the results back to their original registers
     add n' into n
     add c' into c
     clear p then add c'' into p
-
-    < at n'
-    [
-        < +
-        > -
-    ]
-    at n'
-
-    < < <  at c'  
-    [
-        < +
-        > -
-    ]
-    at c'
     
-    clear p
+    add n' into n and return to n'
+    <
+    [
+        < +
+        > -
+    ]
+
+    add c' into c and return to c'
+    < < <
+    [
+        < +
+        > -
+    ]
+    
+    move to p / clear it / then add c'' into p returning to c''
     < < [-]
-    > > >     at c''
+    > > >
     [
         < < < +
         > > > -
     ]
-    at c''
     
     c'' to i
     > > > >
@@ -139,8 +138,10 @@ print n using cell 1 as counter
     >>>>>
     > > >
     
-    >++++++++ ++++++++ ++++++++ ++++++++.[-]<       print space and clear cell
+    print space and clear cell
+    >++++++++ ++++++++ ++++++++ ++++++++.[-]<
      
     -
 ]
->++++++++++.[-]<       print \n then clear cell
+print\n
+>++++++++++.[-]<
