@@ -14,26 +14,9 @@ cell 10 = inner loop counter & special char printer
 >                       p=0
 > > >                   c=c'=c''=0
 > + > >                 n=1 n'=n''=0
-> ++++ +++ +            i=8
+> ++++ +++ ++            i=9
 
 print the first three numbers in the series
-print p by adding 48 to it then subbing it / use cell 1 as counter
-< < < < < < <
-< ++++ ++++
-[
-    > +++ +++
-    < -
-]
-> .
-< ++++ ++++
-[
-    > --- ---
-    < -
-]
->
-> > > > > > >
-
->++++++++ ++++++++ ++++++++ ++++++++.[-]<       print space and clear cell
 
 print c using cell 1 as counter
 < < < < < <
@@ -95,7 +78,7 @@ print n using cell 1 as counter
         > > > +
         < < < -
     ]
-    n' = n + c
+    n' = n plus c
     at c'
     
     add n'' into c' clearing n''
@@ -107,9 +90,7 @@ print n using cell 1 as counter
     c' = n
     at n''
 
-    c'' = c = p
-    // TODO print c''=p
-    n = 0 // n'=n+c // n'' = 0 // c = 0 // c' = n // c'' = c
+    n = 0 // n'=n plus c // n'' = 0 // c = 0 // c' = n // c'' = c = p
     now we need to move these numbers back to their original registers
     add n' into n
     add c' into c
@@ -121,7 +102,6 @@ print n using cell 1 as counter
         > -
     ]
     at n'
-    // TODO print n
 
     < < <  at c'  
     [
@@ -129,7 +109,6 @@ print n using cell 1 as counter
         > -
     ]
     at c'
-    // TODO print c
     
     clear p
     < < [-]
@@ -139,27 +118,26 @@ print n using cell 1 as counter
         > > > -
     ]
     at c''
-    // TODO print p
     
     c'' to i
     > > > >
     
-    print c using cell 1 as counter
+    print n using cell 1 as counter
     '0' to '9' is 48 to 57
-    < < < < < <
-    << ++++ ++++
+    < < <
+    <<<<< ++++ ++++
     [
-        >> +++ +++
-        << -
+        >>>>> +++ +++
+        <<<<< -
     ]
-    >> .
-    << ++++ ++++
+    >>>>> .
+    <<<<< ++++ ++++
     [
-        >> --- ---
-        << -
+        >>>>> --- ---
+        <<<<< -
     ]
-    >>
-    > > > > > >
+    >>>>>
+    > > >
     
     >++++++++ ++++++++ ++++++++ ++++++++.[-]<       print space and clear cell
      
