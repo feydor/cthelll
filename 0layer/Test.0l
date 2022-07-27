@@ -1,0 +1,10 @@
+label:
+    add a,55
+    # a
+    xor a,a,
+    # a
+    sub a,11
+    # a
+    jmp fin
+    jmp label
+fin:

@@ -50,40 +50,6 @@ int strnum(char *s) {
     return n;
 }
 
-void num2reg_op(char *instr, int reg, int n, int line) {
-    if (!strcmp("mov", instr)) {
-        mem[reg] = n;
-    } else if (!strcmp("add", instr)) {
-        mem[reg] += n;
-    } else if (!strcmp("sub", instr)) {
-        mem[reg] -= n;
-    } else if (!strcmp("mul", instr)) {
-        mem[reg] *= n;
-    } else if (!strcmp("div", instr)) {
-        mem[reg] /= n;
-    } else if (!strcmp("mod", instr)) {
-        mem[reg] = mem[reg] % n;
-    } else {
-        fprintf(stderr, "unknown opcode: %d: '%s'\n", line, instr);
-    }
-}
-
-void reg2reg_op(char *instr, int reg1, int reg2, int line) {
-    if (!strcmp("mov", instr)) {
-        mem[reg1] = mem[reg2];
-    } else if(!strcmp("add", instr)) {
-        mem[reg1] += mem[reg2];
-    } else if (!strcmp("xor", instr)) {
-        mem[reg1] ^= mem[reg2];
-    } else if (!strcmp("and", instr)) {
-        mem[reg1] &= mem[reg2];
-    }  else if (!strcmp("or", instr)) {
-        mem[reg1] |= mem[reg2];
-    } else {
-        // fprintf(stderr, "unknown opcode: %d: '%s'\n", line, instr);
-    }
-}
-
 bool isregister(char *operand) {
     assert(strlen(operand) == 1);
     return strfind(regs, operand[0]);
@@ -120,20 +86,87 @@ void concat(char *x, char *y) {
     strcpy(x, new);
 }
 
-bool includes(size_t n, char *arr[n], char *str) {
+// returns the index, if not found returns -1
+size_t findstr(size_t n, char *arr[n], char *str) {
+    size_t pos = -1;
     for (int i = 0; i < n; ++i)
-        if (!strcmp(str, arr[i])) return true;
-    return false;
+        if (!strcmp(str, arr[i])) pos = i;
+    return pos;
 }
 
-bool isunaryop(char *op) {
-    return includes(sizeof(unaryops)/sizeof(unaryops[0]), unaryops, op);
+size_t unaryop(char *op) {
+    return findstr(sizeof(unaryops)/sizeof(unaryops[0]), unaryops, op);
 }
-bool isbinaryop(char *op) {
-    return includes(sizeof(binaryops)/sizeof(binaryops[0]), binaryops, op);
+size_t binaryop(char *op) {
+    return findstr(sizeof(binaryops)/sizeof(binaryops[0]), binaryops, op);
 }
-bool isternaryop(char *op) {
-    return includes(sizeof(ternaryops)/sizeof(ternaryops[0]), ternaryops, op);
+size_t ternaryop(char *op) {
+    return findstr(sizeof(ternaryops)/sizeof(ternaryops[0]), ternaryops, op);
+}
+            
+void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
+    char *op = unaryops[op_idx];
+    if (!strcmp("jmp", op)) {
+        *curr_tok = jmptable[hash(param) + ':']; // NOTE: adding back in the label character
+    } else if (!strcmp("#", op)) {
+        printf("%s: %d\n", param, mem[param[0]-'a']);
+    } else {
+        printf("unary operator, %s, not yet implemented\n", op);
+    }
+}
+
+// NOTE: clobbers params string
+void eval_binary(size_t op_idx, char *params) {
+    // l and rparams can be: reg,reg or reg,num
+    char *lparam = strtok(params, ",");
+    char *rparam = strtok(NULL, ",");
+    if (!lparam || !rparam) {
+        fprintf(stderr, "Parse error in binary op"), exit(-1);
+    } else if (!isregister(lparam)) {
+        fprintf(stderr, "Left param in a binary op must be a register: '%s'", lparam), exit(-1);
+    }
+
+    size_t lreg = lparam[0]-'a';
+    char *op = binaryops[op_idx];
+    if (!strcmp("mov", op)) {
+        if (isnumeric(rparam)) fprintf(stderr, "mov params must both be registers\n"), exit(-1);
+        mem[lreg] = mem[rparam[0]-'a'];
+    } else if (!strcmp("add", op)) {
+        if (isnumeric(rparam)) {
+            mem[lreg] += strnum(rparam);
+        } else {
+            size_t rreg = rparam[0]-'a';
+            mem[lreg] += mem[rreg];
+        }        
+    } else if (!strcmp("sub", op)) {
+        if (isnumeric(rparam)) {
+            mem[lreg] -= strnum(rparam);
+        } else {
+            size_t rreg = rparam[0]-'a';
+            mem[lreg] -= mem[rreg];
+        }
+    } else if (!strcmp("xor", op)) {
+        if (isnumeric(rparam)) {
+            mem[lreg] ^= strnum(rparam);
+        } else {
+            size_t rreg = rparam[0]-'a';
+            mem[lreg] ^= mem[rreg];
+        }
+    } else if (!strcmp("mul", op)) {
+        if (isnumeric(rparam)) {
+            mem[lreg] *= strnum(rparam);
+        } else {
+            size_t rreg = rparam[0]-'a';
+            mem[lreg] *= mem[rreg];
+        }
+    } else if (!strcmp("mod", op)) {
+        if (isnumeric(rparam)) {
+            mem[lreg] %= strnum(rparam);
+        } else {
+            size_t rreg = rparam[0]-'a';
+            mem[lreg] %= mem[rreg];
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -146,7 +179,6 @@ int main(int argc, char *argv[]) {
 
     // first pass
     int tcc = 0;
-    int linecount = 0;
     int ntokens = 0;
     while (tcc != codelen) {
         int cc = 0;
@@ -166,11 +198,10 @@ int main(int argc, char *argv[]) {
         char *tok = strtok(line, " ");
         if (!strcmp(tok, "%") || !strcmp(tok, " ")) {
             tcc += cc+1;
-            linecount++;
             continue;
         } else if (tok[strlen(tok)-1] == ':') {
             if (jmptable[hash(tok)] != NIL) fprintf(stderr, "duplicate label: %d: '%s'\n", lines, tok), exit(1);
-            jmptable[hash(tok)] = linecount;
+            jmptable[hash(tok)] = ntokens;
         }
         
         tokens[ntokens++] = strdup(tok);
@@ -179,99 +210,29 @@ int main(int argc, char *argv[]) {
             tokens[ntokens++] = strdup(tok);
         }
         tcc += cc+1;
-        linecount++;
     }
 
     printf("ntokens: %d\n", ntokens);
 
-    for (int i = 0; i < ntokens; ++i) {
-        if (isunaryop(tokens[i])) {
+    for (size_t i = 0; i < ntokens; ++i) {
+        size_t op = -1;
+        if ((op = unaryop(tokens[i])) != -1) {
             // next token is the single param
-            printf("OP: %s, PARAM: %s\n", tokens[i], tokens[i+1]);
-        } else if (isbinaryop(tokens[i])) {
+            printf("OP: %s, PARAM: %s\n", unaryops[op], tokens[i+1]);
+            eval_unary(op, tokens[i+1], &i);
+            i++;
+        } else if ((op = binaryop(tokens[i])) != -1) {
             // next token are the two params seperated by comma
-            printf("OP: %s, PARAMs: %s\n", tokens[i], tokens[i+1]);
-        } else if (isternaryop(tokens[i])) {
+            printf("OP: %s, PARAMs: %s\n", binaryops[op], tokens[i+1]);
+            eval_binary(op, tokens[i+1]);
+            i++;
+        } else if ((op = ternaryop(tokens[i])) != -1) {
             // next token are the three params seperated by two commas
-            printf("OP: %s, PARAMs: %s\n", tokens[i], tokens[i+1]);
+            printf("OP: %s, PARAMs: %s\n", ternaryops[op], tokens[i+1]);
+            // eval_ternary(op, tokens[i+1], &i);
+            i++;
         }
     }
     
-    /*
-    tcc = 0;
-    int lp = 0;
-    while (tcc < codelen) {
-        int cc = 0;
-        while (code[tcc+cc] != '\n') {
-            cc++;
-        }
-        char line[cc];
-        memcpy(line, code+tcc, cc);
-        line[cc] = '\0';
-        char *pos = NULL;
-        if ((pos = strchr(line, '%'))) {    
-            line[pos-line] = '\0';
-        }
-
-        char *instr = strtok(line, " ");
-        char *operands = strtok(NULL, " ");
-        char *op1 = strtok(operands, ",");
-        char *op2 = strtok(NULL, ",");
-        char *op3 = strtok(NULL, ",");
-        if (!instr) {
-            tcc += cc+1;
-            lp++;
-            continue;
-        }
-        if (operands && op1 && op2 && op3 && isregister(op1) && isnumeric(op2) && islabel(op3)) {
-            if (!strcmp("bne", instr)) {
-                if (mem[op1[strlen(op1)-1]-'a'] != strnum(op2)) {
-                    tcc = jmptable[hash(op3)];
-                    continue;
-                }
-            } else if (!strcmp("beq", instr)) {
-                if (mem[op1[strlen(op1)-1]-'a'] == strnum(op2)) {
-                    tcc = jmptable[hash(op3)];
-                    continue;
-                }
-            } else if (!strcmp("blt", instr)) {
-                if (mem[op1[strlen(op1)-1]-'a'] < strnum(op2)) {
-                    tcc = jmptable[hash(op3)];
-                    continue;
-                }
-            }
-        } else if (operands && op1 && op2 && isregister(op1) && isnumeric(op2)) {
-            int n = strnum(op2);
-            num2reg_op(instr, op1[strlen(op1)-1]-'a', n, lp);
-        } else if (operands && op1 && op2 && isregister(op1) && isregister(op2)) {
-            reg2reg_op(instr, op1[strlen(op1)-1]-'a', op2[strlen(op2)-1]-'a', lp);
-        } else if (operands && islabel(operands)) {
-            // TODO: label_reg_op();
-            if (!strcmp("jmp", instr)) {
-                tcc = jmptable[hash(operands)];
-                continue;
-            } else if (!strcmp("call", instr)) {
-                stack[sp] = tcc + cc + 1;
-                sp++;
-                tcc = jmptable[hash(operands)];
-                continue;
-            }
-        } else if (operands && op1 && isregister(op1))  {
-            // TODO: reg_op();
-            if (!strcmp("#", instr)) {
-                printf("%c: %d\n", op1[strlen(op1)-1], mem[op1[strlen(op1)-1]-'a']);
-            }
-        } else {
-            if (!strcmp("ret", instr)) {
-                tcc = stack[--sp];
-                if (sp < 0) fprintf(stderr, "ret without corresponding call\n"), exit(1);
-                continue;
-            }
-        }
-
-        tcc += cc+1;
-        lp++;
-    }
-    */
     return 0;
 }
