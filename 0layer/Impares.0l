@@ -6,7 +6,7 @@ to100:
     mod a,2
     beq a,0,incr
 print_odd:
-    # b
+    # b     % print
 incr:
     add a,1
     add b,1

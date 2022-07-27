@@ -13,7 +13,11 @@ FILE *fp;
 char code[MAXCODESIZE];
 int jmptable[MAXCODESIZE];
 int stack[MAXCODESIZE];
+char *tokens[MAXCODESIZE];
 int sp = 0;
+char *unaryops[] = {"jmp", "ret", "call", "#"};
+char *binaryops[] = {"add", "sub", "mov", "xor", "mul", "mod", "and", "or"};
+char *ternaryops[] = {"beq", "bne", "bgt", "blt"};
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
 int mem[26] = {0};
 int codelen, lines;
@@ -25,6 +29,7 @@ int hash(char *s) {
     }
     return n;
 }
+
 bool strfind(char *s, char c) {
     while (*s) {
         if (*s == c) return true;
@@ -32,6 +37,7 @@ bool strfind(char *s, char c) {
     }
     return false; 
 }
+
 int strnum(char *s) {
     int n = 0;
     int places = strlen(s);
@@ -43,6 +49,7 @@ int strnum(char *s) {
     }
     return n;
 }
+
 void num2reg_op(char *instr, int reg, int n, int line) {
     if (!strcmp("mov", instr)) {
         mem[reg] = n;
@@ -60,6 +67,7 @@ void num2reg_op(char *instr, int reg, int n, int line) {
         fprintf(stderr, "unknown opcode: %d: '%s'\n", line, instr);
     }
 }
+
 void reg2reg_op(char *instr, int reg1, int reg2, int line) {
     if (!strcmp("mov", instr)) {
         mem[reg1] = mem[reg2];
@@ -75,10 +83,12 @@ void reg2reg_op(char *instr, int reg1, int reg2, int line) {
         // fprintf(stderr, "unknown opcode: %d: '%s'\n", line, instr);
     }
 }
+
 bool isregister(char *operand) {
     assert(strlen(operand) == 1);
     return strfind(regs, operand[0]);
 }
+
 bool isnumeric(char *operand) {
     while (*operand) {
         if (!isdigit(*operand)) return false;
@@ -86,22 +96,46 @@ bool isnumeric(char *operand) {
     }
     return true;
 }
+
 bool islabel(char *operand) {
     return jmptable[hash(operand)] != NIL;
 }
+
 // " tail"
-void trim_ws(char *s) {
+char* trim_ws(char *s) {
     int start = 0;
     while(isspace(*s)) {
         start++;
         s++;
     }
-    if (!start) return;
-    int len = strlen(s) - start;
-    char *tmp = strdup(s);
-    memcpy(s, tmp, len+1);
-    free(tmp);
+    return s;
 }
+
+void concat(char *x, char *y) {
+    size_t xlen = strlen(x);
+    char new[xlen + strlen(y) + 1];
+    memcpy(new, x, xlen);
+    memcpy(new+xlen, y, strlen(y));
+    new[sizeof(new)-1] = '\0';
+    strcpy(x, new);
+}
+
+bool includes(size_t n, char *arr[n], char *str) {
+    for (int i = 0; i < n; ++i)
+        if (!strcmp(str, arr[i])) return true;
+    return false;
+}
+
+bool isunaryop(char *op) {
+    return includes(sizeof(unaryops)/sizeof(unaryops[0]), unaryops, op);
+}
+bool isbinaryop(char *op) {
+    return includes(sizeof(binaryops)/sizeof(binaryops[0]), binaryops, op);
+}
+bool isternaryop(char *op) {
+    return includes(sizeof(ternaryops)/sizeof(ternaryops[0]), ternaryops, op);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) printf("program: layer0 [file]\n"), exit(1);
     if (!(fp = fopen(argv[1], "r"))) fprintf(stderr, "error opening the file.\n"), exit(1);
@@ -109,26 +143,61 @@ int main(int argc, char *argv[]) {
     fclose(fp);
     for (int i = 0; i < sizeof(jmptable)/sizeof(jmptable[0]); ++i)
         jmptable[i] = NIL;
+
     // first pass
     int tcc = 0;
-    lines = 0;
+    int linecount = 0;
+    int ntokens = 0;
     while (tcc != codelen) {
         int cc = 0;
         while (code[tcc+cc] != '\n') {
             cc++;
         }
-        char line[cc];
+
+        char *line = calloc(cc, sizeof(*line));
+        if (!line) {
+            fprintf(stderr, "calloc failed\n");
+            exit(1);
+        }
+
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
-        if (line[strlen(line)-1] == ':') {
-            char *lbl = strtok(line, ":");
-            if (jmptable[hash(lbl)] != NIL) fprintf(stderr, "duplicate label: %d: '%s'\n", lines, lbl), exit(1);
-            jmptable[hash(lbl)] = tcc;
+        line = trim_ws(line);
+        char *tok = strtok(line, " ");
+        if (!strcmp(tok, "%") || !strcmp(tok, " ")) {
+            tcc += cc+1;
+            linecount++;
+            continue;
+        } else if (tok[strlen(tok)-1] == ':') {
+            if (jmptable[hash(tok)] != NIL) fprintf(stderr, "duplicate label: %d: '%s'\n", lines, tok), exit(1);
+            jmptable[hash(tok)] = linecount;
+        }
+        
+        tokens[ntokens++] = strdup(tok);
+        while ((tok = strtok(NULL, " "))) {
+            if (!strcmp(tok, "%") || !strcmp(tok, " ")) break;
+            tokens[ntokens++] = strdup(tok);
         }
         tcc += cc+1;
-        lines++;
+        linecount++;
+    }
+
+    printf("ntokens: %d\n", ntokens);
+
+    for (int i = 0; i < ntokens; ++i) {
+        if (isunaryop(tokens[i])) {
+            // next token is the single param
+            printf("OP: %s, PARAM: %s\n", tokens[i], tokens[i+1]);
+        } else if (isbinaryop(tokens[i])) {
+            // next token are the two params seperated by comma
+            printf("OP: %s, PARAMs: %s\n", tokens[i], tokens[i+1]);
+        } else if (isternaryop(tokens[i])) {
+            // next token are the three params seperated by two commas
+            printf("OP: %s, PARAMs: %s\n", tokens[i], tokens[i+1]);
+        }
     }
     
+    /*
     tcc = 0;
     int lp = 0;
     while (tcc < codelen) {
@@ -203,5 +272,6 @@ int main(int argc, char *argv[]) {
         tcc += cc+1;
         lp++;
     }
+    */
     return 0;
 }
