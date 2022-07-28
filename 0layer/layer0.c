@@ -16,7 +16,7 @@ int jmptable[MAXCODESIZE];
 int stack[333] = {NIL};
 int sp = 0;
 char *unaryops[] = {"jmp", "ret", "call", "#", "push", "pop"};
-char *binaryops[] = {"add", "sub", "mov", "xor", "mul", "mod", "and", "or"};
+char *binaryops[] = {"add", "sub", "mov", "xor", "mul", "mod"};
 char *ternaryops[] = {"beq", "bne", "bgt", "blt"};
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
 int mem[26] = {0};
@@ -66,6 +66,14 @@ bool islabel(char *operand) {
     return jmptable[hash(operand)+':'] != NIL;
 }
 
+bool isstackptr(char *operand) {
+    return operand[0] == 's' && operand[1] == 'p';
+}
+
+int jmptable_lookup(char *label) {
+    return jmptable[hash(label)+':'];
+}
+
 // " tail"
 char* trim_ws(char *s) {
     int start = 0;
@@ -105,27 +113,27 @@ size_t ternaryop(char *op) {
 
 // NOTE: only single digit offsets
 int stackptr_offset(char *param) {
-    return isdigit(param[strlen(param)-1]) ? param[strlen(param)-1]-'0' : 0;
+    return isstackptr(param) && isdigit(param[strlen(param)-1]) ? param[strlen(param)-1]-'0' : 0;
 }
             
 void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
     // error when encountering comma
     char *op = unaryops[op_idx];
     if (!strcmp("jmp", op)) {
-        *curr_tok = jmptable[hash(param) + ':']; // NOTE: adding back in the label character
+        *curr_tok = jmptable_lookup(param);
     } else if (!strcmp("#", op)) {
         if (isnumeric(param)) {
             printf("%s\n", param);
         } else if (isregister(param)){
             printf("%s: %d\n", param, mem[param[0]-'a']);
-        } else {
+        } else if (isstackptr(param)) {
             int offset = stackptr_offset(param);
             printf("%s: %d\n", param, stack[sp - offset]);
         }
     } else if (!strcmp("call", op)) {
         stack[++sp] = (int)*curr_tok;
         if (!islabel(param)) fprintf(stderr, "call procedure must have a valid label: '%s'\n", param), exit(-1);
-        *curr_tok = jmptable[hash(param)+':'];
+        *curr_tok = jmptable_lookup(param);
     } else if (!strcmp("ret", op)) {
         *curr_tok = (size_t)stack[sp];
         sp--;
@@ -149,62 +157,127 @@ void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
 }
 
 void eval_binary(size_t op_idx, char *params) {
-    // l and rparams can be: reg,reg or reg,num
     char *op = binaryops[op_idx];
     char *params_cpy = strdup(params);
     char *lparam = strtok(params_cpy, ",");
     char *rparam = strtok(NULL, ",");
     if (!lparam || !rparam) {
         fprintf(stderr, "Parse error in binary op: '%s'\n", op), exit(-1);
-    } else if (!isregister(lparam)) {
-        fprintf(stderr, "Left param in a binary op must be a register: '%s'\n", lparam), exit(-1);
     }
 
     size_t lreg = lparam[0]-'a';
     size_t rreg = rparam[0]-'a';
+    int loffset = stackptr_offset(lparam);
+    int roffset = stackptr_offset(rparam);
+    if (sp - loffset < 0) fprintf(stderr, "Stack access underflow: sp: %d, loffset: %d\n", sp, loffset), exit(-1);
+    if (sp - roffset < 0) fprintf(stderr, "Stack access underflow: sp: %d, roffset: %d\n", sp, roffset), exit(-1);
     if (!strcmp("mov", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] = strnum(rparam);
-        } else if (isregister(rparam)) {
-            mem[lreg] = mem[rreg];
-        } else {
-            int offset = stackptr_offset(rparam);
-            if (sp - offset < 0) fprintf(stderr, "Stack access underflow: sp: %d, offset: %d\n", sp, offset), exit(-1);
-            mem[lreg] = stack[sp - offset];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] = strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] = mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] = stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] = strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] = mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] = stack[sp - roffset];
+            }
         }
     } else if (!strcmp("add", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] += strnum(rparam);
-        } else if (isregister(rparam)) {
-            mem[lreg] += mem[rreg];
-        } else {
-            int offset = stackptr_offset(rparam);
-            if (sp - offset < 0) fprintf(stderr, "Stack access underflow: sp: %d, offset: %d\n", sp, offset), exit(-1);
-            mem[lreg] += stack[sp - offset];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] += strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] += mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] += stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] += strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] += mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] += stack[sp - roffset];
+            }
         }
     } else if (!strcmp("sub", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] -= strnum(rparam);
-        } else {
-            mem[lreg] -= mem[rreg];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] -= strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] -= mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] -= stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] -= strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] -= mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] -= stack[sp - roffset];
+            }
         }
     } else if (!strcmp("xor", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] ^= strnum(rparam);
-        } else {
-            mem[lreg] ^= mem[rreg];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] ^= strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] ^= mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] ^= stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] ^= strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] ^= mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] ^= stack[sp - roffset];
+            }
         }
     } else if (!strcmp("mul", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] *= strnum(rparam);
-        } else {
-            mem[lreg] *= mem[rreg];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] *= strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] *= mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] *= stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] *= strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] *= mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] *= stack[sp - roffset];
+            }
         }
     } else if (!strcmp("mod", op)) {
-        if (isnumeric(rparam)) {
-            mem[lreg] %= strnum(rparam);
-        } else {
-            mem[lreg] %= mem[rreg];
+        if (isregister(lparam)) {
+            if (isnumeric(rparam)) {
+                mem[lreg] %= strnum(rparam);
+            } else if (isregister(rparam)) {
+                mem[lreg] %= mem[rreg];
+            } else if (isstackptr(rparam)){
+                mem[lreg] %= stack[sp - roffset];
+            }
+        } else if (isstackptr(lparam)) {
+            if (isnumeric(rparam)) {
+                stack[sp - loffset] %= strnum(rparam);
+            } else if (isregister(rparam)) {
+                stack[sp - loffset] %= mem[rreg];
+            } else if (isstackptr(rparam)){
+                stack[sp - loffset] %= stack[sp - roffset];
+            }
         }
     }
 }
@@ -222,7 +295,7 @@ void eval_ternary(size_t op_idx, char *params, size_t *curr_tok) {
     }
 
     char *op = ternaryops[op_idx];
-    int jmptarget = jmptable[hash(c)+':'];
+    int jmptarget = jmptable_lookup(c);
     size_t lreg = a[0]-'a';
     size_t rreg = b[0]-'a';
     if (!strcmp("beq", op)) {
@@ -300,15 +373,11 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < ntokens; ++i) {
         size_t op = -1;
         if ((op = unaryop(tokens[i])) != -1) {
-            // next token is the single param
             eval_unary(op, tokens[i+1], &i);
-            // i++;
         } else if ((op = binaryop(tokens[i])) != -1) {
-            // next token are the two params seperated by comma
             eval_binary(op, tokens[i+1]);
             i++;
         } else if ((op = ternaryop(tokens[i])) != -1) {
-            // next token are the three params seperated by two commas
             eval_ternary(op, tokens[i+1], &i);
         }
     }

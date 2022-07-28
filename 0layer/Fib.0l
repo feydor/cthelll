@@ -12,5 +12,5 @@ loop:
     mov c,n     % current = next 
     # n
     add i,1
-    bne i,31,loop
+    bne i,49,loop
 fin:

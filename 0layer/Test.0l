@@ -9,10 +9,14 @@ add_three:
     # sp+1
     # sp+2
     # sp+3
+    add sp+1,sp+2 
+    add sp+1,sp+3
+    mov sp+3,0
+    # sp+1
+    # sp+2
+    # sp+3
     mov b,sp
     add a,sp+1
-    add a,sp+2
-    add a,sp+3
     pop 4
     push b
     ret
