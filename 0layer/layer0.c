@@ -75,13 +75,12 @@ int jmptable_lookup(char *label) {
 }
 
 // " tail"
-char* trim_ws(char *s) {
+void trim_ws(char *s) {
     int start = 0;
     while(isspace(*s)) {
         start++;
         s++;
     }
-    return s;
 }
 
 void concat(char *x, char *y) {
@@ -158,7 +157,8 @@ void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
 
 void eval_binary(size_t op_idx, char *params) {
     char *op = binaryops[op_idx];
-    char *params_cpy = strdup(params);
+    char params_cpy[strlen(params)];
+    strcpy(params_cpy, params);
     char *lparam = strtok(params_cpy, ",");
     char *rparam = strtok(NULL, ",");
     if (!lparam || !rparam) {
@@ -284,7 +284,8 @@ void eval_binary(size_t op_idx, char *params) {
 
 void eval_ternary(size_t op_idx, char *params, size_t *curr_tok) {
     // params a,b,c can be: reg,reg,label or reg,num,label, or num,num,label
-    char *params_cpy = strdup(params);
+    char params_cpy[strlen(params)];
+    strcpy(params_cpy, params);
     char *a = strtok(params_cpy, ",");
     char *b = strtok(NULL, ",");
     char *c = strtok(NULL, ",");
@@ -344,17 +345,12 @@ int main(int argc, char *argv[]) {
             cc++;
         }
 
-        char *line = calloc(cc, sizeof(*line));
-        if (!line) {
-            fprintf(stderr, "calloc failed\n");
-            exit(1);
-        }
-
+        char line[cc];
         memcpy(line, code+tcc, cc);
         line[cc] = '\0';
-        line = trim_ws(line);
+        trim_ws(line);
         char *tok = strtok(line, " ");
-        if (!strcmp(tok, "%") || !strcmp(tok, " ")) {
+        if (!tok || !strcmp(tok, "%") || !strcmp(tok, " ")) {
             tcc += cc+1;
             continue;
         } else if (tok[strlen(tok)-1] == ':') {
@@ -380,6 +376,10 @@ int main(int argc, char *argv[]) {
         } else if ((op = ternaryop(tokens[i])) != -1) {
             eval_ternary(op, tokens[i+1], &i);
         }
+    }
+
+    for (size_t i = 0; i < ntokens; ++i) {
+        if (tokens[i]) free(tokens[i]);
     }
     
     return 0;
