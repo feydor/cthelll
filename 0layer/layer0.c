@@ -64,7 +64,7 @@ bool isnumeric(char *operand) {
 }
 
 bool islabel(char *operand) {
-    return jmptable[hash(operand)] != NIL;
+    return jmptable[hash(operand)+':'] != NIL;
 }
 
 // " tail"
@@ -105,67 +105,116 @@ size_t ternaryop(char *op) {
 }
             
 void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
+    // error when encountering comma
     char *op = unaryops[op_idx];
     if (!strcmp("jmp", op)) {
         *curr_tok = jmptable[hash(param) + ':']; // NOTE: adding back in the label character
     } else if (!strcmp("#", op)) {
-        printf("%s: %d\n", param, mem[param[0]-'a']);
+        if (isnumeric(param)) {
+            printf("%s\n", param);
+        } else {
+            printf("%s: %d\n", param, mem[param[0]-'a']);
+        }
     } else {
         printf("unary operator, %s, not yet implemented\n", op);
     }
 }
 
-// NOTE: clobbers params string
 void eval_binary(size_t op_idx, char *params) {
     // l and rparams can be: reg,reg or reg,num
-    char *lparam = strtok(params, ",");
+    char *op = binaryops[op_idx];
+    char *params_cpy = strdup(params);
+    char *lparam = strtok(params_cpy, ",");
     char *rparam = strtok(NULL, ",");
     if (!lparam || !rparam) {
-        fprintf(stderr, "Parse error in binary op"), exit(-1);
+        fprintf(stderr, "Parse error in binary op: '%s'\n", op), exit(-1);
     } else if (!isregister(lparam)) {
-        fprintf(stderr, "Left param in a binary op must be a register: '%s'", lparam), exit(-1);
+        fprintf(stderr, "Left param in a binary op must be a register: '%s'\n", lparam), exit(-1);
     }
 
     size_t lreg = lparam[0]-'a';
-    char *op = binaryops[op_idx];
+    size_t rreg = rparam[0]-'a';
     if (!strcmp("mov", op)) {
-        if (isnumeric(rparam)) fprintf(stderr, "mov params must both be registers\n"), exit(-1);
-        mem[lreg] = mem[rparam[0]-'a'];
+        if (isnumeric(rparam)) {
+            mem[lreg] = strnum(rparam);
+        } else {
+            mem[lreg] = mem[rreg];
+        }
     } else if (!strcmp("add", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] += strnum(rparam);
         } else {
-            size_t rreg = rparam[0]-'a';
             mem[lreg] += mem[rreg];
         }        
     } else if (!strcmp("sub", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] -= strnum(rparam);
         } else {
-            size_t rreg = rparam[0]-'a';
             mem[lreg] -= mem[rreg];
         }
     } else if (!strcmp("xor", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] ^= strnum(rparam);
         } else {
-            size_t rreg = rparam[0]-'a';
             mem[lreg] ^= mem[rreg];
         }
     } else if (!strcmp("mul", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] *= strnum(rparam);
         } else {
-            size_t rreg = rparam[0]-'a';
             mem[lreg] *= mem[rreg];
         }
     } else if (!strcmp("mod", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] %= strnum(rparam);
         } else {
-            size_t rreg = rparam[0]-'a';
             mem[lreg] %= mem[rreg];
         }
+    }
+}
+
+void eval_ternary(size_t op_idx, char *params, size_t *curr_tok) {
+    // params a,b,c can be: reg,reg,label or reg,num,label, or num,num,label
+    char *params_cpy = strdup(params);
+    char *a = strtok(params_cpy, ",");
+    char *b = strtok(NULL, ",");
+    char *c = strtok(NULL, ",");
+    if (!a || !b || !c) {
+        fprintf(stderr, "Parse error in ternary op\n"), exit(-1);
+    } else if (!islabel(c)) {
+        fprintf(stderr, "Rightmost param in a ternary op must be a label: '%s'\n", c), exit(-1);
+    }
+
+    char *op = ternaryops[op_idx];
+    int jmptarget = jmptable[hash(c)+':'];
+    size_t lreg = a[0]-'a';
+    size_t rreg = b[0]-'a';
+    if (!strcmp("beq", op)) {
+        if (isnumeric(b)) {
+            if (mem[lreg] == strnum(b)) *curr_tok = jmptarget;
+        } else {
+            if (mem[lreg] == mem[rreg]) *curr_tok = jmptarget;
+        }
+    } else if (!strcmp("bne", op)) {
+        if (isnumeric(b)) {
+            if (mem[lreg] != strnum(b)) *curr_tok = jmptarget;
+        } else {
+            if (mem[lreg] != mem[rreg]) *curr_tok = jmptarget;
+        }
+    } else if (!strcmp("bgt", op)) {
+        if (isnumeric(b)) {
+            if (mem[lreg] > strnum(b)) *curr_tok = jmptarget;
+        } else {
+            if (mem[lreg] > mem[rreg]) *curr_tok = jmptarget;
+        }
+    } else if (!strcmp("blt", op)) {
+        if (isnumeric(b)) {
+            if (mem[lreg] < strnum(b)) *curr_tok = jmptarget;
+        } else {
+            if (mem[lreg] < mem[rreg]) *curr_tok = jmptarget;
+        }
+    } else {
+        printf("Ternary operator not implemented: '%s'\n", op);
     }
 }
 
@@ -212,25 +261,19 @@ int main(int argc, char *argv[]) {
         tcc += cc+1;
     }
 
-    printf("ntokens: %d\n", ntokens);
-
     for (size_t i = 0; i < ntokens; ++i) {
         size_t op = -1;
         if ((op = unaryop(tokens[i])) != -1) {
             // next token is the single param
-            printf("OP: %s, PARAM: %s\n", unaryops[op], tokens[i+1]);
             eval_unary(op, tokens[i+1], &i);
             i++;
         } else if ((op = binaryop(tokens[i])) != -1) {
             // next token are the two params seperated by comma
-            printf("OP: %s, PARAMs: %s\n", binaryops[op], tokens[i+1]);
             eval_binary(op, tokens[i+1]);
             i++;
         } else if ((op = ternaryop(tokens[i])) != -1) {
             // next token are the three params seperated by two commas
-            printf("OP: %s, PARAMs: %s\n", ternaryops[op], tokens[i+1]);
-            // eval_ternary(op, tokens[i+1], &i);
-            i++;
+            eval_ternary(op, tokens[i+1], &i);
         }
     }
     
