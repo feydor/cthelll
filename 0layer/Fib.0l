@@ -1,6 +1,6 @@
 % fibonacci series to x
 debut:
-    mov x,31
+    mov x,95    % x-3 (past this point 64bit integers overflow)
     mov p,0     % prev
     mov c,0     % current
     mov n,1     % next
@@ -12,5 +12,5 @@ loop:
     mov c,n     % current = next 
     # n
     add i,1
-    bne i,49,loop
+    bne i,x,loop
 fin:

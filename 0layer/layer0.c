@@ -19,7 +19,7 @@ char *unaryops[] = {"jmp", "ret", "call", "#", "push", "pop"};
 char *binaryops[] = {"add", "sub", "mov", "xor", "mul", "mod"};
 char *ternaryops[] = {"beq", "bne", "bgt", "blt"};
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
-int mem[26] = {0};
+int64_t mem[26] = {0};
 int codelen, lines;
 int hash(char *s) {
     int n = 0;
@@ -125,7 +125,7 @@ void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
         if (isnumeric(param)) {
             printf("%s\n", param);
         } else if (isregister(param)){
-            printf("%s: %d\n", param, mem[param[0]-'a']);
+            printf("%s: %ld\n", param, mem[param[0]-'a']);
         } else if (isstackptr(param)) {
             int offset = stackptr_offset(param);
             printf("%s: %d\n", param, stack[sp - offset]);
