@@ -1,10 +1,20 @@
-label:
-    add a,55
-    # a
-    xor a,a
-    # a
-    add a,2
-    beq a,2,fin
-    jmp label
+debut:
+    push 11
+    push 22
+    push 33
+    call add_three
+    jmp fin
+add_three:
+    # sp
+    # sp+1
+    # sp+2
+    # sp+3
+    mov b,sp
+    add a,sp+1
+    add a,sp+2
+    add a,sp+3
+    pop 4
+    push b
+    ret
 fin:
     # a

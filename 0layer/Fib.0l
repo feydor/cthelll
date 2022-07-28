@@ -5,13 +5,12 @@ debut:
     mov c,0     % current
     mov n,1     % next
     mov i,3
-    # p
     # c
 loop:
-    # n
     add n,p     % next = current + prev
     mov p,c     % prev = current
     mov c,n     % current = next 
+    # n
     add i,1
     bne i,31,loop
 fin:

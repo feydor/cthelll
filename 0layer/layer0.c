@@ -11,11 +11,11 @@
 #define NIL -1
 FILE *fp;
 char code[MAXCODESIZE];
+char *tokens[MAXCODESIZE/3];
 int jmptable[MAXCODESIZE];
-int stack[MAXCODESIZE];
-char *tokens[MAXCODESIZE];
+int stack[333] = {NIL};
 int sp = 0;
-char *unaryops[] = {"jmp", "ret", "call", "#"};
+char *unaryops[] = {"jmp", "ret", "call", "#", "push", "pop"};
 char *binaryops[] = {"add", "sub", "mov", "xor", "mul", "mod", "and", "or"};
 char *ternaryops[] = {"beq", "bne", "bgt", "blt"};
 char regs[] = "abcdefghijklmnopqrstuvwxyz";
@@ -51,8 +51,7 @@ int strnum(char *s) {
 }
 
 bool isregister(char *operand) {
-    assert(strlen(operand) == 1);
-    return strfind(regs, operand[0]);
+    return strlen(operand) == 1 && strfind(regs, operand[0]);
 }
 
 bool isnumeric(char *operand) {
@@ -103,6 +102,11 @@ size_t binaryop(char *op) {
 size_t ternaryop(char *op) {
     return findstr(sizeof(ternaryops)/sizeof(ternaryops[0]), ternaryops, op);
 }
+
+// NOTE: only single digit offsets
+int stackptr_offset(char *param) {
+    return isdigit(param[strlen(param)-1]) ? param[strlen(param)-1]-'0' : 0;
+}
             
 void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
     // error when encountering comma
@@ -112,9 +116,33 @@ void eval_unary(size_t op_idx, char *param, size_t *curr_tok) {
     } else if (!strcmp("#", op)) {
         if (isnumeric(param)) {
             printf("%s\n", param);
-        } else {
+        } else if (isregister(param)){
             printf("%s: %d\n", param, mem[param[0]-'a']);
+        } else {
+            int offset = stackptr_offset(param);
+            printf("%s: %d\n", param, stack[sp - offset]);
         }
+    } else if (!strcmp("call", op)) {
+        stack[++sp] = (int)*curr_tok;
+        if (!islabel(param)) fprintf(stderr, "call procedure must have a valid label: '%s'\n", param), exit(-1);
+        *curr_tok = jmptable[hash(param)+':'];
+    } else if (!strcmp("ret", op)) {
+        *curr_tok = (size_t)stack[sp];
+        sp--;
+        if (*curr_tok == NIL) fprintf(stderr, "Ret statement without corresponding call\n"), exit(-1);
+    } else if (!strcmp("push", op)) {
+        // param can be reg or number
+        if (isregister(param)) {
+            stack[++sp] = mem[param[0]-'a'];
+        } else {
+            stack[++sp] = strnum(param);
+        }
+    } else if (!strcmp("pop", op)) {
+        // param must be a number
+        if (!isnumeric(param)) fprintf(stderr, "pop's param must be numeric: '%s'\n", param), exit(-1);
+        int to_pop = strnum(param);    
+        if (sp-to_pop < 0) fprintf(stderr, "Stack underflow: %d\n", sp-to_pop), exit(-1);
+        sp -= to_pop;
     } else {
         printf("unary operator, %s, not yet implemented\n", op);
     }
@@ -137,15 +165,23 @@ void eval_binary(size_t op_idx, char *params) {
     if (!strcmp("mov", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] = strnum(rparam);
-        } else {
+        } else if (isregister(rparam)) {
             mem[lreg] = mem[rreg];
+        } else {
+            int offset = stackptr_offset(rparam);
+            if (sp - offset < 0) fprintf(stderr, "Stack access underflow: sp: %d, offset: %d\n", sp, offset), exit(-1);
+            mem[lreg] = stack[sp - offset];
         }
     } else if (!strcmp("add", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] += strnum(rparam);
-        } else {
+        } else if (isregister(rparam)) {
             mem[lreg] += mem[rreg];
-        }        
+        } else {
+            int offset = stackptr_offset(rparam);
+            if (sp - offset < 0) fprintf(stderr, "Stack access underflow: sp: %d, offset: %d\n", sp, offset), exit(-1);
+            mem[lreg] += stack[sp - offset];
+        }
     } else if (!strcmp("sub", op)) {
         if (isnumeric(rparam)) {
             mem[lreg] -= strnum(rparam);
@@ -266,7 +302,7 @@ int main(int argc, char *argv[]) {
         if ((op = unaryop(tokens[i])) != -1) {
             // next token is the single param
             eval_unary(op, tokens[i+1], &i);
-            i++;
+            // i++;
         } else if ((op = binaryop(tokens[i])) != -1) {
             // next token are the two params seperated by comma
             eval_binary(op, tokens[i+1]);
