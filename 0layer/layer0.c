@@ -12,7 +12,7 @@
 FILE *fp;
 char code[MAXCODESIZE];
 char *tokens[MAXCODESIZE/3];
-int jmptable[MAXCODESIZE];
+int jmptable[MAXCODESIZE/3];
 int stack[333] = {NIL};
 int sp = 0;
 char *unaryops[] = {"jmp", "ret", "call", "#", "push", "pop"};
