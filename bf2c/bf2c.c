@@ -1,9 +1,43 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define MAXCODESIZE 3333
 #define MEMSIZE 30000
 #define PRINTSIZE 32
 char code[MAXCODESIZE];
+char *ctrl_ops = "><[].,#";
+char *mut_ops = "+-";
+
+int cumul_mutations(int len, char code[len], int *i) {
+    int n = 0;
+    while (!strchr(ctrl_ops, code[*i])) {
+        if (code[*i] == '+') n++;
+        else if (code[*i] == '-') n--;
+        (*i)++;
+    }
+    (*i)--; // because forloop continues to next char
+    return n;
+}
+
+int cumul_moves(int len, char code[len], int *i) {
+    int n = 0;
+    char *other_ctrl_ops = "[].,#";
+    while (!strchr(mut_ops, code[*i]) && !strchr(other_ctrl_ops, code[*i])) {
+        if (code[*i] == '>') n++;
+        else if (code[*i] == '<') n--;
+        (*i)++;
+    }
+    (*i)--; // because forloop continues to next char
+    return n;
+}
+
+void test_cumul() {
+    char code[] = "----- ++++ > ++++++ ----";
+    int i = 0;
+    int n = cumul_mutations(sizeof(code), code, &i);
+    printf("%d\n", n);
+}
 
 int main(int argc, const char *argv[]) {
     if (argc > 2) fprintf(stderr, "too many arguments\n"), exit(1);
@@ -19,10 +53,10 @@ int main(int argc, const char *argv[]) {
     printf("char cin;\n");
     for (int i = 0; i < codelen; ++i) {
         switch(code[i]) {
-        case '+': printf("cells[ptr]++;\n"); break;
-        case '-': printf("cells[ptr]--;\n"); break;
-        case '>': printf("ptr++;\n"); break;
-        case '<': printf("ptr--;\n"); break;
+        case '+': /* FALLTHROUGH */
+        case '-': printf("cells[ptr] += %d;\n", cumul_mutations(codelen, code, &i)); break;
+        case '>': /* FALLTHROUGH */
+        case '<': printf("ptr += %d;\n", cumul_moves(codelen, code, &i)); break;
         case '[': {
                       printf("while (cells[ptr]) {\n");
                   } break;
