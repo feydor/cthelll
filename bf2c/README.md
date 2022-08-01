@@ -1,4 +1,6 @@
 # bf2c
+brainfuck to C transpiler
+
 ```b
 [obfuscated fibonacci series]
 [i=9: 0 1 1 2 3 5 8 = E R g ]
