@@ -1,5 +1,7 @@
 # bf2c
-brainfuck to C transpiler
+brainfuck to C transpiler using the following optimizations:
+- constant folding of consecutive ptr shifts or mutations, `++++----- = *ptr-=1`
+- clear cell idiom, `[-] = *ptr=0`
 
 ```b
 [obfuscated fibonacci series]
