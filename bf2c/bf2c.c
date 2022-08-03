@@ -10,32 +10,59 @@ int codelen;
 char *ctrl_ops = "><[].,#";
 char *mut_ops = "+-";
 
-int cumul_mutations(int *i) {
+typedef struct BfOp {
+    int index;
+    int operand;
+} BfOp;
+
+int cumul_mutations(int *cp) {
     int n = 0;
-    while (!strchr(ctrl_ops, code[*i])) {
-        if (code[*i] == '+') n++;
-        else if (code[*i] == '-') n--;
-        (*i)++;
+    while (!strchr(ctrl_ops, code[*cp])) {
+        if (code[*cp] == '+') n++;
+        else if (code[*cp] == '-') n--;
+        (*cp)++;
     }
-    (*i)--; // because forloop continues to next char
     return n;
 }
 
-int cumul_moves(int *i) {
+int cumul_moves(int *cp) {
     int n = 0;
     char *other_ctrl_ops = "[].,#";
-    while (!strchr(mut_ops, code[*i]) && !strchr(other_ctrl_ops, code[*i])) {
-        if (code[*i] == '>') n++;
-        else if (code[*i] == '<') n--;
-        (*i)++;
+    while (!strchr(mut_ops, code[*cp]) && !strchr(other_ctrl_ops, code[*cp])) {
+        if (code[*cp] == '>') n++;
+        else if (code[*cp] == '<') n--;
+        (*cp)++;
     }
-    (*i)--; // because forloop continues to next char
     return n;
 }
 
-char next_op(int *i) {
-    while (!strchr(ctrl_ops, code[*i]) && !strchr(mut_ops, code[*i])) (*i)++;
-    return code[*i];
+char next_op(int *cp) {
+    while (!strchr(ctrl_ops, code[*cp]) && !strchr(mut_ops, code[*cp])) (*cp)++;
+    return code[*cp];
+}
+
+bool is_mutating(int cp) {
+    return code[cp] == '+' || code[cp] == '-';
+}
+
+bool is_moving(int cp) {
+    return code[cp] == '>' || code[cp] == '<';
+}
+
+void fun() {
+    /**
+     * a loop consists of:
+     * 1. the last ptr location before the loop starts
+     * 2. all of the ops inside of the loop
+     *      - ops == consecutive moves or mutations
+     *        ">> ----" are two ops:
+     *              - Op1{type: MOV, addr: memptr, operand: 2}, Op2{type: MUT, addr: memptr+2, operand: -4}
+     *      - these can be combined into mutations at specific addresses
+     *              - Op{type: MUT, addr: memptr+Op1.operand, operand: -4}
+     * 3. if one of the ops addr == addr before loop starts, then that op is being used as a loop index
+     *      - ie while (cells[IndexOp.addr]-->0)
+     *    then the rest of the combined Ops can be considered multiply ops of IndexOp.original_memory * Op1.operand
+     */
 }
 
 int main(int argc, const char *argv[]) {
@@ -50,21 +77,23 @@ int main(int argc, const char *argv[]) {
     printf("short int cells[%d] = {0};\nshort int *ptr = cells;\n", MEMSIZE);
     printf("int stack[%d], sp = 0;\n", MAXCODESIZE);
     printf("char cin;\n");
-    for (int i = 0; i < codelen; ++i) {
-        switch(code[i]) {
+    for (int cp = 0; cp < codelen; ++cp) {
+        switch(code[cp]) {
         case '+': /* FALLTHROUGH */
-        case '-': printf("*ptr += %d;\n", cumul_mutations(&i)); break;
+        case '-': printf("*ptr += %d;\n", cumul_mutations(&cp)); --cp; break;
         case '>': /* FALLTHROUGH */
-        case '<': printf("ptr += %d;\n", cumul_moves(&i)); break;
+        case '<': printf("ptr += %d;\n", cumul_moves(&cp)); --cp; break;
         case '[': {
-                      int j = i+1;
+                      int j = cp+1;
                       char a = next_op(&j);
                       j++;
                       char b = next_op(&j);
                       if (a == '-' && b == ']') {
                           printf("*ptr = 0;\n");
-                          i = j;
-                      } else printf("while (*ptr) {\n");
+                          cp = j;
+                      }
+
+                      else printf("while (*ptr) {\n");
                   } break;
         case ']': printf("}\n"); break;
         case '.': printf("putchar(*ptr == 10 ? '\\n' : *ptr); fflush(stdout);\n"); break;
